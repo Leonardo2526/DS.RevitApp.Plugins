@@ -22,9 +22,9 @@ namespace DS.Revit.MEPAutoCoordination.Offset
         List<Element> _MovableElements;
         BoundingBoxIntersectsFilter BBIntersectsFilter;
         List<Solid> Solids;
-        Element FamInstToMove;
+        List<Element> FamInstToMove;
 
-        public MovableElementCollision(List<Element> elems, BoundingBoxIntersectsFilter bbIntersectsFilter, List<Solid> solids, Element famInstToMove)
+        public MovableElementCollision(List<Element> elems, BoundingBoxIntersectsFilter bbIntersectsFilter, List<Solid> solids, List<Element> famInstToMove)
         {
             _MovableElements = elems;
             BBIntersectsFilter = bbIntersectsFilter;
@@ -120,9 +120,14 @@ namespace DS.Revit.MEPAutoCoordination.Offset
          
             ICollection<ElementId> elementsIds = _MovableElements.Select(el => el.Id).ToList();
 
-            //Element el = MovableElement.FamInstToMove;
             if (FamInstToMove !=null)
-            elementsIds.Add(FamInstToMove.Id);
+            {
+                foreach (var item in FamInstToMove)
+                {
+                    elementsIds.Add(item.Id);
+                }
+            }
+                
 
             ExclusionFilter exclusionFilter = new ExclusionFilter(elementsIds);
 

@@ -9,7 +9,7 @@ namespace DS.Revit.MEPAutoCoordination.Offset
     class CollisionResolver
     {       
         List<int> startMovableElementCollisions = new List<int>();
-        public static int StartColllisionsCount;
+        public static int StartCollisionsCount = 0;
         public bool IsResolved;
 
         /// <summary>
@@ -44,16 +44,17 @@ namespace DS.Revit.MEPAutoCoordination.Offset
                 if (!movableElement.IsMovableElementsCountValid)
                     continue;
 
-                if (StartColllisionsCount == 0)
-                {
+                
                     foreach (int c in startMovableElementCollisions)
-                        StartColllisionsCount += c;
-                }
+                        StartCollisionsCount += c;
+                
               
 
-                Dictionary<Element, XYZ> staticCenterPoints = movableElement.GetStaticCenterPoints();
+                var staticCenterPoints = movableElement.GetStaticCenterPoints();
 
-                if (Position.IfAvailableExist(moveVector, movableElement, staticCenterPoints))
+                var positionRefact = new Position(moveVector, movableElement, staticCenterPoints);
+                positionRefact.Find();
+                if (positionRefact.PositonFound)
                 {
                     IsResolved = true;
                     break;

@@ -1,22 +1,14 @@
 ﻿using Autodesk.Revit.DB;
 using System.Collections.Generic;
+using DS.Revit.Utils;
 
 namespace DS.Revit.MEPAutoCoordination.Offset
 {
 
     class LineCollision
     {
-        readonly Document Doc;
-
-        public LineCollision(Document doc)
-        {
-            Doc = doc;
-        }
-
-        ElementUtils ElemUtils = new ElementUtils();
-
-        Dictionary<Element, List<Solid>> modelSolids = new Dictionary<Element, List<Solid>>();
-        Dictionary<Element, List<Solid>> linksSolids = new Dictionary<Element, List<Solid>>();
+        public Dictionary<Element, List<Solid>> ModelSolidsForCollisionCheck { get; set; } = new Dictionary<Element, List<Solid>>();
+        public Dictionary<Element, List<Solid>> LinksSolidsForCollisionCheck { get; set; } = new Dictionary<Element, List<Solid>>();
 
         public IList<Element> GetElementsCurveCollisions(Curve curve, Dictionary<Element, List<Solid>> elementsSolids)
         {
@@ -39,104 +31,10 @@ namespace DS.Revit.MEPAutoCoordination.Offset
             return intersectedElements;
         }
 
-        /// <summary>
-        /// Get solids of elements by boundig box from current model.
-        /// </summary>   
-        public Dictionary<Element, List<Solid>> GetModelSolids(FilteredElementCollector collector, BoundingBoxIntersectsFilter boundingBoxFilter)
+        public void SetModelSolids(List<Line> allCurrentPositionLines, List<Element> excludedElements)
         {
-            //Get the elements witch intersect bounding box
-            IList<Element> intersectedElementsBox = collector.WherePasses(boundingBoxFilter).ToElements();
-
-            List<Solid> solids = new List<Solid>();
-            Dictionary<Element, List<Solid>> collectorSolids = new Dictionary<Element, List<Solid>>();
-
-            foreach (Element elem in intersectedElementsBox)
-            {
-                solids = ElemUtils.GetSolids(elem);
-                collectorSolids.Add(elem, solids);
-            }
-
-            return collectorSolids;
-        }
-
-        /// <summary>
-        /// Get solids of elements by boundig box from all linked models.
-        /// </summary>   
-        public Dictionary<Element, List<Solid>> GetLinkSolids(BoundingBoxIntersectsFilter boundingBoxFilter)
-        {
-            foreach (RevitLinkInstance m_currentInstance in Data.AllLinks)
-            {
-                if (m_currentInstance != null)
-                {
-                    // Get the handle to the element in the link
-                    Document linkedDoc = m_currentInstance.GetLinkDocument();
-                    FilteredElementCollector collector = new FilteredElementCollector(linkedDoc, Data.AllLinkedElementsIds);
-                    Dictionary<Element, List<Solid>> currentLinkSolids = GetModelSolids(collector, boundingBoxFilter);
-
-                    foreach (KeyValuePair<Element, List<Solid>> keyValue in currentLinkSolids)
-                        linksSolids.Add(keyValue.Key, keyValue.Value);
-
-                }
-            }
-
-            return linksSolids;
-
-        }
-     
-
-        /// <summary>
-        /// Get solids of elements by boundig box from current model and all linked models.
-        /// </summary>    
-        public void GetAllModelSolids(List<Line> allCurrentPositionLines)
-        {
-            BoundingBoxFilter boundingBoxFilter = new BoundingBoxFilter();
-
-            BoundingBoxIntersectsFilter boundingBoxIntersectsFilter = 
-                boundingBoxFilter.GetBoundingBoxFilter(new LinesBoundingBox(allCurrentPositionLines));
-
-            FilteredElementCollector collector = null;
-            try
-            {
-                collector = new FilteredElementCollector(Doc, Data.NotConnectedToElem1ElementIds);
-                modelSolids = GetModelSolids(collector, boundingBoxIntersectsFilter);
-            }
-            catch
-            { }
-
-            linksSolids = GetLinkSolids(boundingBoxIntersectsFilter);
-        }
-
-        public void GetAllModelSolidsForObstacled(List<Line> allCurrentPositionLines, MovableElement movableElement)
-        {
-            BoundingBoxFilter boundingBoxFilter = new BoundingBoxFilter();
-
-            BoundingBoxIntersectsFilter boundingBoxIntersectsFilter =
-                boundingBoxFilter.GetBoundingBoxFilter(new LinesBoundingBox(allCurrentPositionLines));
-
-            //Get excluded elements
-            ICollection<ElementId> elementIds = new List<ElementId>();
-            List<Element> elements = new List<Element>();
-
-            foreach (Element el in movableElement.MovableElements)
-                elementIds.Add(el.Id);
-
-            if (movableElement.FamInstToMove !=null)
-            elementIds.Add(movableElement.FamInstToMove.Id);
-
-            ExclusionFilter exclusionFilter = new ExclusionFilter(elementIds);
-
-            //Get collector
-            FilteredElementCollector collector = null;
-            try
-            {
-                collector = new FilteredElementCollector(Doc, Data.NotConnectedToElem1ElementIds);
-                collector.WherePasses(exclusionFilter);
-                modelSolids = GetModelSolids(collector, boundingBoxIntersectsFilter);
-            }
-            catch
-            { }
-
-            linksSolids = GetLinkSolids(boundingBoxIntersectsFilter);
+            ModelSolidsForCollisionCheck = SolidByLines.GetSolidsByExclusions(allCurrentPositionLines, excludedElements);
+            LinksSolidsForCollisionCheck = SolidByLines.GetSolidsByExclusionsInLinks(allCurrentPositionLines, excludedElements);
         }
 
         /// <summary>
@@ -144,8 +42,8 @@ namespace DS.Revit.MEPAutoCoordination.Offset
         /// </summary>  
         public IList<Element> GetAllLinesCollisions(Curve curve)
         {
-            IList<Element> CollisionsInModel = GetElementsCurveCollisions(curve, modelSolids);
-            IList<Element> CollisionsInLink = GetElementsCurveCollisions(curve, linksSolids);
+            IList<Element> CollisionsInModel = GetElementsCurveCollisions(curve, ModelSolidsForCollisionCheck);
+            IList<Element> CollisionsInLink = GetElementsCurveCollisions(curve, LinksSolidsForCollisionCheck);
 
 
             List<Element> allCollisions = new List<Element>();
